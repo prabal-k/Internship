@@ -1,13 +1,15 @@
+create database sales_analysis;
+
 -- BASIC QUESTIONS
 
 -- 1.How many customers do not have DOB information available ?
 
-SELECT COUNT(*) from customer_dim where dob is NULL;
+SELECT COUNT(*) from customer_dim where dob ='';
 
 -- 2.How many customers are there in each pincode and gender combination ?
 
-SELECT p.pincode,c.gender,count(c.cus_id) from customer_dim c inner join 
-pincode_din p on c.primary_pincode=p.pincode group by p.pincode,c.gender;
+SELECT p.pincode,c.gender,count(c.cust_id) from customer_dim c inner join 
+pincode_dim p on c.primary_pincode=p.pincode group by p.pincode,c.gender;
 
 -- 3.Print product name and mrp for products which have more than 50000 mrp ?
 
@@ -23,7 +25,7 @@ group by pincode;
 -- paid by 'cash'. Take only 'buy' order types ?
 
 Select delivery_pincode,count(order_id),SUM(total_amount_paid),AVG(total_amount_paid),
-MAX(total_amount_paid),MIN(total-amount_paid) from order_dim where payment_type='cash' and
+MAX(total_amount_paid),MIN(total_amount_paid) from order_dim where payment_type='cash' and
 order_type = 'buy' group by delivery_pincode;
 
 -- 6. For each delivery_person_id, print the count of orders and total amount paid for
@@ -52,16 +54,19 @@ delivery_pincode having avg_amount>150000;
 --  Order month
 --  Order year
 
-Select date(order_date) as order_date ,year(order_date) as order_year,
-month(order_date) as order_month,
-day(order_date) as order_day from order_dim;
+select substring(order_date,1,2) from order_dim;
+
+
+Select  order_date ,substring(order_date,7,4) as order_year,
+substring(order_date,4,2) as order_month,
+substring(order_date,1,2) as order_day from order_dim;
 
 -- 10. How many total orders were there in each month and how many of them were
 -- returned? Add a column for return rate too.
 -- return rate = (100.0 * total return orders) / total buy orders
 -- Hint: You will need to combine SUM() with CASE WHEN
 
-select month(order_date) as month,count(order_id) 
+select substring(order_date,4,2) as month,count(order_id) 
 as total_orders,sum(case when order_type = 'Return' then 1 else 0 end) as return_orders,
 (100.0 * sum(case when order_type = 'Return' then 1 else 0 end) / sum(case when order_type = 'Buy' then 1 else 0 end)) As return_rate
 from order_dim group by month;
@@ -73,16 +78,16 @@ from order_dim group by month;
 SELECT p.brand,sum(case when o.order_type = 'Buy' then o.tot_units else 0 end) as units_sold,
 sum(case when o.order_type = 'Return' then o.tot_units else 0 end) as units_returned
 from product_dim p
-inner join order_dim o on p.product_id = od.product_id
+inner join order_dim o on p.product_id = o.product_id
 group by p.brand;
 
 -- 12. How many distinct customers and delivery boys are there in each state?
 
-select distinct count(c.cust_id) as total_customers,count(d.delivery_person_id)
-as total_delivery_persons,p.state from customer_dim as c
-inner join  pincode_din p on p.pincode=c.primary_pincode 
-left join order_din o on p.pincode = o.delivery_pincode
-left join delivery_person_din as d on o.delivery_person_id = d.delivery_person_id 
+select distinct p.state,count(c.cust_id) as total_customers,count(d.delivery_person_id)
+as total_delivery_persons from customer_dim as c
+inner join  pincode_dim p on p.pincode=c.primary_pincode 
+left join order_dim o on p.pincode = o.delivery_pincode
+left join delivery_person_dim as d on o.delivery_person_id = d.delivery_person_id 
 group by p.state;
 
 
@@ -99,7 +104,7 @@ sum(case when  c.primary_pincode <> o.delivery_pincode  then o.tot_units else 0 
 from customer_dim c
 inner join order_dim o on c.cust_id = o.cust_id
 group by c.cust_id
-order by percente DESC;
+order by percent DESC;
 
 
 -- 14. For each product name, print the sum of number of units, total amount paid, total
@@ -109,12 +114,29 @@ order by percente DESC;
 -- the net discount from mrp (i.e. 100.0 - 100.0 * total amount paid / total mrp)
 
 select p.product_name,sum(o.tot_units),sum(o.total_amount_paid) ,
-sum(p.displayed_selling_price_per_unit * o.tot_units) as total_selling_price,
+sum(o.displayed_selling_price_per_unit * o.tot_units) as total_selling_price,
 sum(p.mrp * o.tot_units) as total_mrp,
-100.0 - 100.0 * sum(o.total_amount_paid) / sum(p.displayed_selling_price_per_unit * o.tot_units) as net_discount,
+100.0 - 100.0 * sum(o.total_amount_paid) / sum(o.displayed_selling_price_per_unit * o.tot_units) as net_discount,
 100.0 - 100.0 * sum(o.total_amount_paid) / sum(p.mrp * o.tot_units) as net_discount_from_mrp
 from product_dim p
 inner join order_dim o on p.product_id = o.product_id
 group by p.product_name;
+
+
+-- Advance Questions:
+-- 15. For every order_id (exclude returns), get the product name and calculate the discount
+-- percentage from selling price. Sort by highest discount and print only those rows where
+-- discount percentage was above 10.10%.
+
+SELECT 
+    order_id,
+    product_name,
+    ROUND(100 * (displayed_selling_price_per_unit - total_amount_paid / tot_units) / displayed_selling_price_per_unit, 2) AS discount_percentage
+FROM order_dim
+JOIN product_dim ON product_dim.product_id = order_dim.product_id
+WHERE order_type != 'return'
+AND total_amount_paid / tot_units < displayed_selling_price_per_unit
+HAVING discount_percentage > 10.10
+ORDER BY discount_percentage DESC;
 
 
