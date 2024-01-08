@@ -72,8 +72,8 @@ from order_dim group by month;
 -- 11. How many units have been sold by each brand? Also get total returned units for each
 -- brand.
 
-SELECT p.brand,sum(case when o.order_type = 'Buy' then o.tot_units else 0 end) as units_sold,
-sum(case when o.order_type = 'Return' then o.tot_units else 0 end) as units_returned
+SELECT p.brand,sum(case when o.order_type = 'Buy' then o.tot_units else 0 end) as sold_units,
+sum(case when o.order_type = 'Return' then o.tot_units else 0 end) as returned_units
 from product_dim p
 inner join order_dim o on p.product_id = o.product_id
 group by p.brand;
@@ -122,10 +122,10 @@ group by p.product_name;
 -- discount percentage was above 10.10%.
 
 Select order_id,product_name,
-ROUND(100 * (displayed_selling_price_per_unit - total_amount_paid / tot_units) / displayed_selling_price_per_unit, 2) AS discount_percentage
+round(100 * (displayed_selling_price_per_unit - total_amount_paid / tot_units) / displayed_selling_price_per_unit, 2) AS discount_percentage
 from order_dim
 inner join product_dim on product_dim.product_id = order_dim.product_id
-where order_type != 'return'and total_amount_paid / tot_units < displayed_selling_price_per_unit
+where order_type != 'return' and (total_amount_paid / tot_units) < displayed_selling_price_per_unit
 having discount_percentage > 10.10 order by discount_percentage desc;
 
 
@@ -136,7 +136,7 @@ having discount_percentage > 10.10 order by discount_percentage desc;
 -- Percentage Profit = 100.0 * Total Amt Sold / Total Procurement Cost - 100.0
 
 select p.category,sum(o.total_amount_paid) - sum(o.tot_units * p.procurement_cost_per_unit) as absolute_profit,
-100.0 * sum(o.total_amount_paid) / SUM(o.tot_units * p.procurement_cost_per_unit) - 100.0 as percentage_profit
+(100.0 * sum(o.total_amount_paid) / SUM(o.tot_units * p.procurement_cost_per_unit) - 100.0) as percentage_profit
 from order_dim o inner join product_dim p on o.product_id = p.product_id
 where o.order_type = 'buy' group by p.category order by absolute_profit DESC limit 1;
 
@@ -177,8 +177,7 @@ group by c.gender;
 -- discount from selling price? Take only 'buy' order types
 
 select tot_units,avg(o.displayed_selling_price_per_unit - o.total_amount_paid / tot_units) as avg_discount
-from order_dim o
-inner join product_dim p on o.product_id = p.product_id
+from order_dim o inner join product_dim p on o.product_id = p.product_id
 where product_name = 'Dell AX420' and order_type = 'buy'
 group by tot_units order by avg_discount desc;
 
